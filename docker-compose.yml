@@ -1,0 +1,66 @@
+# Local development stack. Uses the in-memory store and local object folder;
+# no MySQL, no cloud credentials. Production runs on Cloud Run + Firestore + GCS.
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      PUBLIC_API_URL: http://localhost:${APP_PORT:-4000}
+      CORS_ORIGINS: http://localhost:${WEB_PORT:-5173}
+      LOG_LEVEL: info
+      STORAGE_DRIVER: local
+      DB_DRIVER: memory
+      AUTH_MODE: dev
+      STORAGE_ROOT: var/objects
+      SIGNED_URL_SECRET: ${SIGNED_URL_SECRET:-local-compose-signing-secret-change-me}
+      DEV_USER_ID: ${DEV_USER_ID:-dev-user}
+      DEV_USER_EMAIL: ${DEV_USER_EMAIL:-dev@utilityhub.local}
+      DEV_USER_NAME: ${DEV_USER_NAME:-Dev User}
+      WORKER_POLL: "false"
+    ports:
+      - "127.0.0.1:${APP_PORT:-4000}:4000"
+    volumes:
+      - utilityhub_objects:/app/var/objects
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4000/api/v1/health/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  # No separate worker: the local memory store is process-local, so the API
+  # runs jobs in-process when WORKER_URL is unset (see docs/JOB_LIFECYCLE.md).
+
+  web:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    init: true
+    environment:
+      API_PROXY_TARGET: http://api:4000
+      VITE_AUTH_MODE: dev
+    ports:
+      - "127.0.0.1:${WEB_PORT:-5173}:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  utilityhub_objects:

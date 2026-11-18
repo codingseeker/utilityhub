@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// UtilityHub stores job metadata in Firestore, but every read and write goes
+// through the Cloud Run API using the Admin SDK. Browser clients never talk to
+// Firestore directly, so no client access is granted.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

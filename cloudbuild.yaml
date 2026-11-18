@@ -1,0 +1,201 @@
+# ---------------------------------------------------------------------------
+# UtilityHub — build and deploy API, worker, cleanup job, and Firebase Hosting.
+#
+# Run with the dedicated build service account:
+#   gcloud builds submit --config cloudbuild.yaml \
+#     --service-account=utilityhub-build@$PROJECT_ID.iam.gserviceaccount.com \
+#     --substitutions=_BUCKET=...,_FIREBASE_API_KEY=...,_FIREBASE_AUTH_DOMAIN=...,
+#                    _FIREBASE_APP_ID=...,_FIREBASE_MESSAGING_SENDER_ID=...
+#
+# Every value below can be overridden with --substitutions.
+# ---------------------------------------------------------------------------
+substitutions:
+  _REGION: asia-southeast1
+  _REPO: utilityhub
+  _BUCKET: utilityhub-prod-REPLACE_ME
+  _HOSTING_ORIGIN: ""
+  _API_SERVICE: utilityhub-api
+  _WORKER_SERVICE: utilityhub-worker
+  _CLEANUP_JOB: utilityhub-cleanup
+  _FIREBASE_API_KEY: ""
+  _FIREBASE_AUTH_DOMAIN: ""
+  _FIREBASE_APP_ID: ""
+  _FIREBASE_MESSAGING_SENDER_ID: ""
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+timeout: 3600s
+
+steps:
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$BUILD_ID
+      - --file=backend/Dockerfile
+      - backend
+
+  - id: build-worker
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$BUILD_ID
+      - --file=backend/Dockerfile.worker
+      - backend
+
+  - id: push-api
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-api]
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$BUILD_ID
+
+  - id: push-worker
+    name: gcr.io/cloud-builders/docker
+    waitFor: [build-worker]
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$BUILD_ID
+
+  - id: deploy-worker
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [push-worker]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        gcloud run deploy "${_WORKER_SERVICE}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$BUILD_ID" \
+          --service-account "utilityhub-worker@$PROJECT_ID.iam.gserviceaccount.com" \
+          --no-allow-unauthenticated \
+          --ingress internal-and-cloud-load-balancing \
+          --cpu 2 \
+          --memory 2Gi \
+          --concurrency 1 \
+          --timeout 900 \
+          --min-instances 0 \
+          --max-instances 3 \
+          --set-env-vars "^@^NODE_ENV=production@GCP_PROJECT_ID=$PROJECT_ID@GCS_BUCKET=${_BUCKET}@FIRESTORE_DATABASE_ID=(default)@STORAGE_DRIVER=gcs@DB_DRIVER=firestore@AUTH_MODE=firebase@LOG_LEVEL=info@TRUST_PROXY=true@WORKER_POLL=false@WORKER_CONCURRENCY=1" \
+          --set-secrets "WORKER_SHARED_SECRET=utilityhub-worker-shared-secret:latest"
+
+        WORKER_URL=$$(gcloud run services describe "${_WORKER_SERVICE}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --format='value(status.url)')
+
+        # The worker verifies the OIDC audience, so it needs its own URL too.
+        gcloud run services update "${_WORKER_SERVICE}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --update-env-vars "WORKER_URL=$$WORKER_URL" \
+          --quiet
+
+        gcloud run services add-iam-policy-binding "${_WORKER_SERVICE}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --member "serviceAccount:utilityhub-api@$PROJECT_ID.iam.gserviceaccount.com" \
+          --role roles/run.invoker \
+          --quiet
+
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [deploy-worker]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        WORKER_URL=$$(gcloud run services describe "${_WORKER_SERVICE}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --format='value(status.url)')
+        HOSTING_ORIGIN="${_HOSTING_ORIGIN}"
+        if [ -z "$$HOSTING_ORIGIN" ]; then
+          HOSTING_ORIGIN="https://$PROJECT_ID.web.app"
+        fi
+
+        gcloud run deploy "${_API_SERVICE}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$BUILD_ID" \
+          --service-account "utilityhub-api@$PROJECT_ID.iam.gserviceaccount.com" \
+          --allow-unauthenticated \
+          --ingress all \
+          --cpu 1 \
+          --memory 512Mi \
+          --concurrency 40 \
+          --timeout 60 \
+          --min-instances 0 \
+          --max-instances 10 \
+          --set-env-vars "^@^NODE_ENV=production@GCP_PROJECT_ID=$PROJECT_ID@GCS_BUCKET=${_BUCKET}@FIRESTORE_DATABASE_ID=(default)@STORAGE_DRIVER=gcs@DB_DRIVER=firestore@AUTH_MODE=firebase@LOG_LEVEL=info@TRUST_PROXY=true@CORS_ORIGINS=$$HOSTING_ORIGIN@PUBLIC_API_URL=$$HOSTING_ORIGIN@WORKER_URL=$$WORKER_URL" \
+          --set-secrets "WORKER_SHARED_SECRET=utilityhub-worker-shared-secret:latest"
+
+  - id: deploy-cleanup
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    waitFor: [push-worker]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        gcloud run jobs deploy "${_CLEANUP_JOB}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$BUILD_ID" \
+          --service-account "utilityhub-cleanup@$PROJECT_ID.iam.gserviceaccount.com" \
+          --command node \
+          --args src/worker.js,--cleanup \
+          --max-retries 1 \
+          --task-timeout 900 \
+          --set-env-vars "^@^NODE_ENV=production@GCP_PROJECT_ID=$PROJECT_ID@GCS_BUCKET=${_BUCKET}@FIRESTORE_DATABASE_ID=(default)@STORAGE_DRIVER=gcs@DB_DRIVER=firestore@AUTH_MODE=firebase@LOG_LEVEL=info@WORKER_POLL=false"
+
+        gcloud run jobs add-iam-policy-binding "${_CLEANUP_JOB}" \
+          --project "$PROJECT_ID" \
+          --region "${_REGION}" \
+          --member "serviceAccount:utilityhub-scheduler@$PROJECT_ID.iam.gserviceaccount.com" \
+          --role roles/run.invoker \
+          --quiet
+
+  - id: build-hosting
+    name: node:22
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        cd frontend
+        npm ci
+        npm run build
+    env:
+      - VITE_API_BASE_URL=/api/v1
+      - VITE_AUTH_MODE=firebase
+      - VITE_FIREBASE_API_KEY=${_FIREBASE_API_KEY}
+      - VITE_FIREBASE_AUTH_DOMAIN=${_FIREBASE_AUTH_DOMAIN}
+      - VITE_FIREBASE_PROJECT_ID=$PROJECT_ID
+      - VITE_FIREBASE_APP_ID=${_FIREBASE_APP_ID}
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=${_FIREBASE_MESSAGING_SENDER_ID}
+
+  - id: deploy-hosting
+    name: node:22
+    waitFor: [build-hosting]
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        npx --yes firebase-tools@13 deploy \
+          --only hosting,firestore:rules,firestore:indexes \
+          --project "$PROJECT_ID" \
+          --non-interactive
+    env:
+      - PROJECT_ID=$PROJECT_ID
+      - GOOGLE_CLOUD_PROJECT=$PROJECT_ID
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/worker:$BUILD_ID
