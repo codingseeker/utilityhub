@@ -2,11 +2,9 @@ import { useEffect, useState } from "react";
 import {
   createJob,
   deleteJob,
-  discardUpload,
   fetchJob,
   formatApiError,
   requestDownload,
-  uploadJobFiles,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
@@ -266,27 +264,23 @@ export default function ToolPage({ tool, navigate }) {
     }
 
     setUpload({ active: true, progress: 0, stage: "uploading" });
-    let uploadIds = [];
     try {
-      uploadIds = await uploadJobFiles(
-        files.map((entry) => entry.file),
-        (progress) => setUpload({ active: true, progress, stage: "uploading" }),
-      );
-      setUpload({ active: true, progress: 100, stage: "creating" });
       const created = await createJob(
         {
           operation: tool.id,
-          uploads: uploadIds,
-          options: buildOptions(tool, options),
+          files: files.map((entry) => entry.file),
+          parameters: buildOptions(tool, options),
         },
+        (progress) => setUpload({
+          active: true,
+          progress,
+          stage: progress >= 100 ? "creating" : "uploading",
+        }),
       );
       setJob(created);
       window.history.replaceState({}, "", `/tools/${tool.id}?job=${created.id}`);
     } catch (error) {
       setFormError(error);
-      if (uploadIds.length > 0) {
-        for (const uploadId of uploadIds) discardUpload(uploadId).catch(() => undefined);
-      }
     } finally {
       setUpload({ active: false, progress: 0, stage: null });
     }

@@ -90,6 +90,23 @@ export default function JobPanel({
           </dl>
         ) : null}
 
+        {Array.isArray(result.previewRows) && result.previewRows.length > 0 ? (
+          <div className="table-wrap" aria-label="Table preview">
+            <table className="data-table">
+              <thead>
+                <tr>{result.previewRows[0].map((cell, index) => <th key={index}>{cell}</th>)}</tr>
+              </thead>
+              <tbody>
+                {result.previewRows.slice(1).map((row, rowIndex) => (
+                  <tr key={rowIndex}>
+                    {row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+
         {actionError ? <p className="form-error" role="alert">{actionError.message}</p> : null}
 
         <div className="job-actions">

@@ -1,19 +1,11 @@
-import { isOfficeFile } from "./services/fileTypes.js";
-
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const DEFAULT_API_BASE = supabaseUrl
   ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/api`
   : "";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
 
-const LOCAL_ONLY_MESSAGE =
-  "Office files are processed in this browser and are never uploaded to Cloud Storage or the API.";
-
-function assertCloudSafe(files) {
-  if (Array.isArray(files) && files.some(isOfficeFile)) {
-    throw new ApiError(LOCAL_ONLY_MESSAGE, { code: "LOCAL_ONLY_FILE" });
-  }
-}
+const OFFICE_FILE_MESSAGE =
+  "Office files are processed in this browser and are never uploaded to the cloud.";
 
 export class ApiError extends Error {
   constructor(message, { code = "REQUEST_FAILED", status = 0, details, requestId } = {}) {
@@ -45,22 +37,24 @@ function errorFrom(payload, status, fallback) {
   });
 }
 
-async function request(path, { method = "GET", body, headers = {}, signal } = {}) {
+async function request(path = "", { method = "GET", body, headers = {}, signal } = {}) {
   if (!API_BASE) {
     throw new ApiError("The demo backend URL is not configured for this deployment.", {
-      code: "SUPABASE_NOT_CONFIGURED",
+      code: "BACKEND_NOT_CONFIGURED",
     });
   }
+
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers: {
         Accept: "application/json",
-        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(!isFormData && body !== undefined ? { "Content-Type": "application/json" } : {}),
         ...headers,
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
       signal,
     });
   } catch (error) {
@@ -70,18 +64,74 @@ async function request(path, { method = "GET", body, headers = {}, signal } = {}
     });
   }
 
-  const text = await response.text();
-  const payload = parseJson(text);
-
-  if (!response.ok) {
-    throw errorFrom(payload, response.status, "The request could not be completed.");
-  }
-
+  const payload = parseJson(await response.text());
+  if (!response.ok) throw errorFrom(payload, response.status, "The request could not be completed.");
   return payload?.data ?? payload;
 }
 
 function callEdge(action, values = {}) {
   return request("", { method: "POST", body: { action, ...values } });
+}
+
+function normalizeOperation(operation) {
+  const names = {
+    "merge-pdf": "merge_pdf",
+    "split-pdf": "split_pdf",
+    "compress-pdf": "compress_pdf",
+    "rotate-pdf": "rotate_pdf",
+    "images-to-pdf": "images_to_pdf",
+    "pdf-to-images": "pdf_to_images",
+    "image-convert": "image_convert",
+    "image-compress": "image_compress",
+    "color-picker": "color_picker",
+    "csv-to-json": "csv_to_json",
+    "json-to-csv": "json_to_csv",
+    "json-format": "json_formatter",
+    "table-preview": "table_preview",
+    "text-case": "case_changer",
+    "text-counter": "word_counter",
+    "text-cleaner": "text_cleaner",
+    "docx-to-txt": "docx_to_text",
+    "txt-to-docx": "text_to_docx",
+    "pptx-to-txt": "pptx_to_text",
+    "txt-to-pptx": "text_to_pptx",
+  };
+  return names[operation] || operation.replaceAll("-", "_");
+}
+
+function frontendOperation(operation) {
+  const names = {
+    merge_pdf: "merge-pdf",
+    split_pdf: "split-pdf",
+    compress_pdf: "compress-pdf",
+    rotate_pdf: "rotate-pdf",
+    images_to_pdf: "images-to-pdf",
+    pdf_to_images: "pdf-to-images",
+    image_convert: "image-convert",
+    image_compress: "image-compress",
+    color_picker: "color-picker",
+    csv_to_json: "csv-to-json",
+    json_to_csv: "json-to-csv",
+    json_formatter: "json-format",
+    table_preview: "table-preview",
+    case_changer: "text-case",
+    word_counter: "text-counter",
+    text_cleaner: "text-cleaner",
+    docx_to_text: "docx-to-txt",
+    text_to_docx: "txt-to-docx",
+    pptx_to_text: "pptx-to-txt",
+    text_to_pptx: "txt-to-pptx",
+  };
+  return names[operation] || operation;
+}
+
+function normalizeJob(job) {
+  if (!job) return job;
+  return {
+    ...job,
+    operation: frontendOperation(job.operation),
+    error: job.error || (job.error_message ? { message: job.error_message } : undefined),
+  };
 }
 
 export function fetchCatalog() {
@@ -96,61 +146,33 @@ export async function startSession() {
   return { id: "anonymous" };
 }
 
-export async function initUploads(files) {
-  assertCloudSafe(files);
-  const uploads = [];
-  for (const file of files) {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let binary = "";
-    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-    }
-    const response = await callEdge("upload", { filename: file.name, file: btoa(binary) });
-    uploads.push({ uploadId: response.jobId });
+export async function createJob({ operation, files, parameters }, onProgress) {
+  if (!Array.isArray(files) || files.length === 0) {
+    throw new ApiError("Select at least one file to process.");
   }
-  return { uploads };
-}
-
-export async function discardUpload(uploadId) {
-  return callEdge("delete", { jobId: uploadId });
-}
-
-/** Sends file bytes to the demo endpoint and reports completion. */
-export async function uploadJobFiles(files, onProgress) {
-  assertCloudSafe(files);
-  const { uploads } = await initUploads(files);
+  if (files.some((file) => /\.(docx|pptx)$/i.test(file.name))) {
+    throw new ApiError(OFFICE_FILE_MESSAGE, { code: "LOCAL_ONLY_FILE" });
+  }
+  const form = new FormData();
+  form.append("operation", normalizeOperation(operation));
+  form.append("parameters", JSON.stringify(parameters || {}));
+  for (const file of files) form.append("files", file, file.name);
+  onProgress?.(10);
+  const response = await request("", { method: "POST", body: form });
   onProgress?.(100);
-  return uploads.map((upload) => upload.uploadId);
-}
-
-export async function createJob({ uploads }) {
-  if (!uploads?.length) throw new ApiError("Upload a file to start processing.");
-  const response = await callEdge("process", { jobId: uploads[0] });
-  return normalizeJob(response.job);
-}
-
-function normalizeJob(job) {
-  if (!job) return job;
-  return {
-    ...job,
-    result: job.result || {
-      fileName: job.filename,
-      sizeBytes: 0,
-      path: job.result_path,
-    },
-  };
+  return normalizeJob(response?.job);
 }
 
 export async function fetchJob(jobId) {
-  const response = await callEdge("status", { jobId });
-  return normalizeJob(response.job);
+  const response = await request(`?action=status&jobId=${encodeURIComponent(jobId)}`);
+  return normalizeJob(response?.job);
 }
 
-export async function requestDownload(jobId) {
+export function requestDownload(jobId) {
   return callEdge("download", { jobId });
 }
 
-export async function deleteJob(jobId) {
+export function deleteJob(jobId) {
   return callEdge("delete", { jobId });
 }
 
