@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import ToolIcon from "../components/ToolIcon.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
-import { CATEGORY_META, TOOL_SUMMARIES } from "../tools.js";
+import { CATEGORY_META, TOOL_SUMMARIES, runtimeBadge } from "../tools.js";
 
 export default function BrowsePage({ tools, navigate, initialCategory }) {
   const [query, setQuery] = useState("");
@@ -22,8 +22,9 @@ export default function BrowsePage({ tools, navigate, initialCategory }) {
         <p className="eyebrow">The full bench</p>
         <h1 className="display">Browse tools.</h1>
         <p className="page-lede">
-          Eighteen real tools. Cloud processors for files, instant utilities for
-          quick maths. Filter by category or search by name.
+          {tools.length} real tools. Cloud processors for files, instant
+          utilities for quick maths, and Office tools that never leave this tab.
+          Filter by category or search by name.
         </p>
       </header>
 
@@ -71,7 +72,7 @@ export default function BrowsePage({ tools, navigate, initialCategory }) {
           {filtered.map((tool) => (
             <a
               key={tool.id}
-              className={`browse-card${tool.runtime === "client" ? " browse-card-client" : ""}`}
+              className={`browse-card${tool.runtime === "client" ? " browse-card-client" : ""}${tool.runtime === "local" ? " browse-card-local" : ""}`}
               href={`/tools/${tool.id}`}
               onClick={(event) => {
                 event.preventDefault();
@@ -80,7 +81,7 @@ export default function BrowsePage({ tools, navigate, initialCategory }) {
             >
               <div className="browse-card-top">
                 <span className="tool-icon"><ToolIcon id={tool.id} size={26} /></span>
-                <StatusBadge status={tool.runtime} label={tool.runtime === "client" ? "INSTANT" : "CLOUD"} />
+                <StatusBadge {...runtimeBadge(tool)} />
               </div>
               <h2>{tool.name}</h2>
               <p>{TOOL_SUMMARIES[tool.id] || tool.description}</p>

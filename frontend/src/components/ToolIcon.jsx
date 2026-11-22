@@ -125,6 +125,38 @@ const paths = {
       <path d="M16 4h4M18 2v4" />
     </>
   ),
+  "docx-to-txt": (
+    <>
+      <path d="M5 3.5h9l4 4v13H5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" />
+      <path d="M14 3.5v4h4" />
+      <path d="M7 12h8M7 15h8M7 18h5" />
+      <path d="m15 15 3 2-3 2" />
+    </>
+  ),
+  "txt-to-docx": (
+    <>
+      <path d="M5 3.5h9l4 4v13H5a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" />
+      <path d="M14 3.5v4h4" />
+      <path d="M7 12h6M7 15h6M7 18h4" />
+      <path d="M15 13v5M13 15l2-2 2 2" />
+    </>
+  ),
+  "pptx-to-txt": (
+    <>
+      <rect x="3" y="4" width="18" height="12" rx="1.5" />
+      <path d="M8 20h8M12 16v4" />
+      <path d="M7 8h6M7 11h4" />
+      <path d="m15 9 3 2-3 2" />
+    </>
+  ),
+  "txt-to-pptx": (
+    <>
+      <rect x="3" y="4" width="18" height="12" rx="1.5" />
+      <path d="M8 20h8M12 16v4" />
+      <path d="M7 8h5M7 11h3" />
+      <path d="M14 10h4M16 8v4" />
+    </>
+  ),
   "unit-converter": (
     <>
       <path d="M4 8h16M4 16h16" />

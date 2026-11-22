@@ -9,6 +9,7 @@ const LABELS = {
   offline: "Offline",
   checking: "Checking",
   client: "Instant",
+  local: "Local",
   cloud: "Cloud",
 };
 

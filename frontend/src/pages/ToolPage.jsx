@@ -13,6 +13,7 @@ import {
   buildOptions,
   defaultOptions,
   formatBytes,
+  isLocalTool,
   optionValueLabel,
   optionVisible,
   validateOptions,
@@ -24,7 +25,10 @@ import FileList from "../components/FileList.jsx";
 import JobPanel from "../components/JobPanel.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import ToolIcon from "../components/ToolIcon.jsx";
+import { FileServiceRouter } from "../services/FileServiceRouter.js";
+import { OFFICE_TO_PDF_MESSAGE, isOfficeFile } from "../services/fileTypes.js";
 import ClientToolPage from "./ClientToolPage.jsx";
+import LocalToolPage from "./LocalToolPage.jsx";
 
 function makeKey() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -65,6 +69,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
   const maxBytes = maxSizeFor(tool);
   const maxTotal = maxTotalFor(tool);
   const isClient = tool.runtime === "client";
+  const isLocal = isLocalTool(tool);
 
   useEffect(() => {
     setFiles([]);
@@ -75,6 +80,8 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     setUpload({ active: false, progress: 0, stage: null });
 
     if (isClient) return;
+
+    if (isLocal) return;
 
     const params = new URLSearchParams(window.location.search);
     const jobId = params.get("job");
@@ -99,7 +106,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     return () => {
       cancelled = true;
     };
-  }, [tool.id, user?.uid, isClient, getAuthHeaders, tool]);
+  }, [tool.id, user?.uid, isClient, isLocal, getAuthHeaders, tool]);
 
   useEffect(() => {
     if (!job || (job.status !== "queued" && job.status !== "processing") || !user) {
@@ -145,6 +152,10 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     return <ClientToolPage tool={tool} navigate={navigate} />;
   }
 
+  if (isLocal) {
+    return <LocalToolPage tool={tool} navigate={navigate} />;
+  }
+
   if (!user) {
     return (
       <main className="page-shell narrow-page">
@@ -178,6 +189,13 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
       }
       if (file.size === 0) {
         localError = `${file.name} is empty.`;
+        continue;
+      }
+      if (isOfficeFile(file)) {
+        localError =
+          tool.category === "pdf" || (tool.input?.extensions || []).includes(".pdf")
+            ? OFFICE_TO_PDF_MESSAGE
+            : `${file.name} is an Office file. Use a ● LOCAL Office tool so it stays in your browser.`;
         continue;
       }
       if (!isAccepted(file, tool)) {
@@ -258,6 +276,15 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     const optionError = validateOptions(tool, options);
     if (optionError) {
       setFormError(optionError);
+      return;
+    }
+
+    const route = FileServiceRouter.route({
+      operationId: tool.id,
+      files: files.map((entry) => entry.file),
+    });
+    if (route.runtime !== "cloud") {
+      setFormError(OFFICE_TO_PDF_MESSAGE);
       return;
     }
 

@@ -769,7 +769,7 @@ svg {
 
 .category-strip {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 0;
   border: 2px solid var(--line);
   box-shadow: 6px 6px 0 var(--shadow);
@@ -896,6 +896,29 @@ svg {
 
 .tool-card-client:hover {
   background: var(--mustard);
+}
+
+.tool-card-local {
+  background: color-mix(in srgb, var(--mustard) 55%, var(--panel));
+}
+
+.tool-card-local .tool-link,
+.tool-card-local p,
+.tool-card-local .tool-index {
+  color: var(--ink);
+}
+
+.tool-card-local .tool-index {
+  opacity: 0.65;
+}
+
+.tool-card-local:hover {
+  background: var(--mustard);
+}
+
+.tool-card-local .tool-icon {
+  background: var(--ink);
+  color: var(--mustard);
 }
 
 .tool-card-top {
@@ -1135,6 +1158,27 @@ svg {
   color: var(--ink);
 }
 
+.browse-card-local {
+  background: color-mix(in srgb, var(--mustard) 55%, var(--panel));
+}
+
+.browse-card-local p,
+.browse-card-local .browse-card-foot {
+  color: var(--ink);
+}
+
+.browse-card-local p {
+  opacity: 0.78;
+}
+
+.browse-card-local .browse-card-foot {
+  border-color: var(--ink);
+}
+
+.browse-card-local:hover {
+  background: var(--mustard);
+}
+
 .browse-card-top {
   display: flex;
   align-items: flex-start;
@@ -1224,6 +1268,12 @@ svg {
 .status-badge-client {
   background: var(--ink);
   color: var(--mint);
+  border-color: var(--ink);
+}
+
+.status-badge-local {
+  background: var(--mustard);
+  color: var(--ink);
   border-color: var(--ink);
 }
 
@@ -1541,6 +1591,11 @@ svg {
 .file-badge-txt,
 .file-badge-md {
   background: var(--paper);
+}
+
+.file-badge-docx,
+.file-badge-pptx {
+  background: var(--mustard);
 }
 
 .file-text {
@@ -2438,6 +2493,99 @@ svg {
   top: 92px;
 }
 
+/* ---------- Local Office tools ---------- */
+
+.local-panel {
+  border: 2px solid var(--line);
+  background: var(--panel);
+  box-shadow: 6px 6px 0 var(--shadow);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.local-panel-working {
+  background: color-mix(in srgb, var(--mustard) 18%, var(--panel));
+}
+
+.local-panel h2 {
+  margin: 0;
+}
+
+.local-spinner {
+  width: 46px;
+  height: 46px;
+  border: 4px solid var(--line);
+  border-top-color: var(--mint);
+  animation: local-spin 800ms linear infinite;
+}
+
+@keyframes local-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.local-proof {
+  margin: 4px 0 0;
+  padding: 6px 9px;
+  border: 2px solid var(--ink);
+  background: var(--mustard);
+  color: var(--ink);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.local-error {
+  margin-top: 14px;
+  border: 3px solid var(--ink);
+  border-left-width: 12px;
+  background: color-mix(in srgb, var(--danger) 18%, var(--panel));
+  box-shadow: 6px 6px 0 var(--shadow);
+  padding: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.local-error p {
+  margin: 4px 0 0;
+}
+
+.local-error .eyebrow {
+  margin: 0;
+  color: var(--ink);
+  opacity: 0.65;
+}
+
+.local-error-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 2px solid var(--ink);
+  background: var(--danger);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.local-boundary {
+  background: color-mix(in srgb, var(--mustard) 22%, var(--panel));
+}
+
+.local-boundary .small {
+  margin-top: 10px;
+  color: var(--muted);
+}
+
+.local-panel-done .privacy-note {
+  margin-top: 6px;
+}
+
 /* ---------- Footer ---------- */
 
 .footer {
@@ -2583,7 +2731,7 @@ svg {
   }
 
   .category-tile:last-child {
-    grid-column: span 2;
+    grid-column: auto;
     border-right: 0;
   }
 

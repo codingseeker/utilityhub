@@ -1,4 +1,15 @@
+import { isOfficeFile } from "./services/fileTypes.js";
+
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api/v1").replace(/\/+$/, "");
+
+const LOCAL_ONLY_MESSAGE =
+  "Office files are processed in this browser and are never uploaded to Cloud Storage or the API.";
+
+function assertCloudSafe(files) {
+  if (Array.isArray(files) && files.some(isOfficeFile)) {
+    throw new ApiError(LOCAL_ONLY_MESSAGE, { code: "LOCAL_ONLY_FILE" });
+  }
+}
 
 const EXTENSION_MIME = {
   pdf: "application/pdf",
@@ -95,6 +106,7 @@ export async function startSession(auth) {
 }
 
 export async function initUploads(files, auth) {
+  assertCloudSafe(files);
   return request("/uploads/init", {
     method: "POST",
     auth,
@@ -109,6 +121,7 @@ export async function initUploads(files, auth) {
 }
 
 export function uploadToSignedUrl(upload, file, onProgress) {
+  assertCloudSafe([file]);
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(upload.method || "PUT", upload.url);
@@ -164,6 +177,7 @@ export async function discardUpload(uploadId, auth) {
  * pass through the API; the browser PUTs directly to the signed storage URL.
  */
 export async function uploadJobFiles(files, auth, onProgress) {
+  assertCloudSafe(files);
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0) || 1;
   const { uploads } = await initUploads(files, auth);
   if (!Array.isArray(uploads) || uploads.length !== files.length) {

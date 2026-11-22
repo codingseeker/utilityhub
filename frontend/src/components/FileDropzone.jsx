@@ -6,6 +6,7 @@ const KIND_LABEL = {
   csv: "CSV files",
   json: "JSON files",
   text: "text files",
+  office: "Office files",
 };
 
 export default function FileDropzone({ onFiles, accept, extensions = [], multiple, disabled, kind, maxSizeLabel }) {

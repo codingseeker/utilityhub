@@ -1,8 +1,8 @@
 import ToolIcon from "../components/ToolIcon.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
-import { CATEGORY_META, TOOL_SUMMARIES } from "../tools.js";
+import { CATEGORY_META, TOOL_SUMMARIES, runtimeBadge } from "../tools.js";
 
-const FEATURED = ["merge-pdf", "compress-pdf", "image-convert", "csv-to-json", "text-counter", "unit-converter"];
+const FEATURED = ["merge-pdf", "compress-pdf", "image-convert", "csv-to-json", "text-counter", "docx-to-txt", "unit-converter"];
 
 export default function HomePage({ tools, navigate, catalogError, apiStatus }) {
   const featured = FEATURED.map((id) => tools.find((tool) => tool.id === id)).filter(Boolean);
@@ -14,29 +14,29 @@ export default function HomePage({ tools, navigate, catalogError, apiStatus }) {
         <div className="hero-copy">
           <div className="hero-kicker">
             <StatusBadge status={apiStatus} label={apiStatus === "online" ? "Cloud API online" : apiStatus === "offline" ? "Cloud API offline" : "Checking cloud"} dot />
-            <span className="mono">GCP · FIRESTORE · CLOUD RUN · GCS</span>
+            <span className="mono">GCP · CLOUD RUN · GCS · BROWSER</span>
           </div>
           <h1 className="display hero-title">
             EVERY TOOL.
-            <span className="hero-line-2">ONE CLOUD.</span>
+            <span className="hero-line-2">CLOUD + LOCAL.</span>
           </h1>
           <p className="hero-lede">
             A blunt, fast utility bench for real files. PDFs, images, CSV,
-            JSON, and text run on Cloud Run workers. Nothing is pretend, and
-            every output is verified before you download it.
+            JSON, and text run on Cloud Run workers. Word and PowerPoint tools
+            run entirely in this tab — their bytes never touch the network.
           </p>
           <div className="hero-actions">
             <button type="button" className="button button-mustard button-large" onClick={() => navigate("/tools/merge-pdf")}>
               Start with a PDF →
             </button>
             <button type="button" className="button button-ghost button-large" onClick={() => navigate("/browse")}>
-              Browse all 18 tools
+              Browse all {tools.length} tools
             </button>
           </div>
           <ul className="hero-points mono">
             <li>Signed uploads</li>
             <li>24h result retention</li>
-            <li>Firebase identity</li>
+            <li>Local Office tools</li>
           </ul>
         </div>
 
@@ -99,15 +99,15 @@ export default function HomePage({ tools, navigate, catalogError, apiStatus }) {
             <h2 className="display">Pick a sharp tool.</h2>
           </div>
           <p>
-            Client utilities run instantly in your browser. Cloud tools use a
-            signed upload, a queued job, and a short-lived download link.
+            Instant utilities and Office tools run in your browser. Cloud tools
+            use a signed upload, a queued job, and a short-lived download link.
           </p>
         </div>
 
         <div className="tool-grid">
           {featured.map((tool, index) => (
             <a
-              className={`tool-card${tool.runtime === "client" ? " tool-card-client" : ""}`}
+              className={`tool-card${tool.runtime === "client" ? " tool-card-client" : ""}${tool.runtime === "local" ? " tool-card-local" : ""}`}
               href={`/tools/${tool.id}`}
               key={tool.id}
               onClick={(event) => {
@@ -119,7 +119,7 @@ export default function HomePage({ tools, navigate, catalogError, apiStatus }) {
                 <span className="tool-icon"><ToolIcon id={tool.id} /></span>
                 <span className="tool-index mono">{String(index + 1).padStart(2, "0")}</span>
               </div>
-              <StatusBadge status={tool.runtime} label={tool.runtime === "client" ? "INSTANT" : "CLOUD"} />
+              <StatusBadge {...runtimeBadge(tool)} />
               <h3>{tool.name}</h3>
               <p>{TOOL_SUMMARIES[tool.id] || tool.description}</p>
               <span className="tool-link mono">OPEN TOOL <span aria-hidden="true">↗</span></span>

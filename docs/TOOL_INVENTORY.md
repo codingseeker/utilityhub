@@ -52,6 +52,17 @@ All six are real implementations and are retained in the GCP worker.
 
 Client-side utilities are explicitly labelled **INSTANT** rather than **CLOUD** so the UI never implies a server job where none exists.
 
+### 2.5 Office (browser-local, no job, no upload)
+
+| Tool ID | Name | Inputs | Output | Local implementation |
+| --- | --- | --- | --- | --- |
+| `docx-to-txt` | DOCX to TXT | 1 `.docx` | TXT | `mammoth.extractRawText` in `LocalFileAdapter` |
+| `txt-to-docx` | TXT to DOCX | 1 `.txt`/`.md` | DOCX | `docx` Document + `Packer.toBlob` |
+| `pptx-to-txt` | PPTX to TXT | 1 `.pptx` | TXT | `JSZip` + `fast-xml-parser` over `ppt/slides/slideN.xml` |
+| `txt-to-pptx` | TXT to PPTX | 1 `.txt`/`.md` | PPTX | `PptxGenJS`, one slide per non-empty line |
+
+Office tools are labelled **● LOCAL**. `FileServiceRouter` routes `.docx` and `.pptx` exclusively to `LocalFileAdapter`; the API client rejects them before upload as a second guard. Office → PDF is intentionally unsupported and returns: "Direct PDF conversion for Office files is not supported locally. Please use the extract text tools."
+
 ## 3. Reusable server-side logic
 
 | Module | Reuse in GCP worker | Change required |

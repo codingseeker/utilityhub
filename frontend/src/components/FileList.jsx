@@ -16,6 +16,8 @@ function kindLabel(file) {
     json: "JSON",
     txt: "TXT",
     md: "MD",
+    docx: "DOCX",
+    pptx: "PPTX",
   };
   return map[extension] || "FILE";
 }

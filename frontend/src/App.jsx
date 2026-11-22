@@ -3,7 +3,7 @@ import { fetchCatalog } from "./api.js";
 import AuthModal from "./components/AuthModal.jsx";
 import Footer from "./components/Footer.jsx";
 import Header from "./components/Header.jsx";
-import { FALLBACK_TOOLS, toolById } from "./tools.js";
+import { FALLBACK_TOOLS, mergeCatalogOperations, toolById } from "./tools.js";
 import BrowsePage from "./pages/BrowsePage.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import RecentPage from "./pages/RecentPage.jsx";
@@ -53,7 +53,7 @@ export default function App() {
       .then((data) => {
         if (cancelled) return;
         if (Array.isArray(data?.operations) && data.operations.length > 0) {
-          setTools(data.operations);
+          setTools(mergeCatalogOperations(data.operations));
         }
         setApiStatus("online");
         setCatalogError(false);

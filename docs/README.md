@@ -10,7 +10,7 @@ Read these first. They describe the application as it exists in this workspace.
 | Document | Purpose |
 | --- | --- |
 | [`EXISTING_PROJECT_AUDIT.md`](./EXISTING_PROJECT_AUDIT.md) | What the inherited repository contained and what was replaced |
-| [`TOOL_INVENTORY.md`](./TOOL_INVENTORY.md) | The 16 cloud operations and 2 client utilities, inputs, limits, and outputs |
+| [`TOOL_INVENTORY.md`](./TOOL_INVENTORY.md) | The 16 cloud operations, 2 client utilities, and 4 local Office tools: inputs, limits, and outputs |
 | [`FRONTEND_ARCHITECTURE.md`](./FRONTEND_ARCHITECTURE.md) | React/Vite structure, auth, upload/polling flow, design system |
 | [`API_CONTRACT.md`](./API_CONTRACT.md) | Authoritative HTTP contract and error codes |
 | [`JOB_LIFECYCLE.md`](./JOB_LIFECYCLE.md) | Job states, leases, retries, expiry, cleanup |

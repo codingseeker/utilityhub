@@ -20,12 +20,14 @@ processing; Firestore tracks job state; results expire automatically.
 | Photo | Image converter, compressor, color picker |
 | Data | CSV → JSON, JSON → CSV, JSON formatter, table preview |
 | Text | Case changer, counter, line/whitespace cleaner |
+| Office (local) | DOCX → TXT, TXT → DOCX, PPTX → TXT, TXT → PPTX |
 | Utilities | Unit converter, percentage calculator (instant, client-side) |
 
 Cloud tools use real engines: `pdf-lib`, Ghostscript, Poppler, Sharp, and
-PapaParse. There is no fake progress, no simulated result, and no local
-document processing by default. Unit and percentage utilities intentionally run
-in the browser and are labeled `INSTANT`.
+PapaParse. There is no fake progress and no simulated result. Unit and
+percentage utilities run in the browser and are labeled `INSTANT`. Office tools
+run in the browser with `mammoth`, `docx`, `JSZip`, and `PptxGenJS`; they are
+labeled `● LOCAL` and their bytes never reach the API, GCS, or a worker.
 
 ## Architecture
 
@@ -47,6 +49,8 @@ flowchart LR
 Key properties:
 
 - The browser never sends file bytes through the API.
+- DOCX and PPTX files are intercepted by `FileServiceRouter` and processed by
+  `LocalFileAdapter`; they are never uploaded to GCS or sent to a worker.
 - Production refuses local storage, in-memory data, or dev auth at startup.
 - Jobs are user-scoped and use 90-second leases with heartbeat and retry.
 - Results expire after 24 hours; GCS lifecycle is a one-day safety net.
@@ -55,6 +59,8 @@ Key properties:
 ## Stack
 
 - **Frontend:** React 19, Vite 8, Firebase Auth 11, custom Neo-Brutalist CSS.
+  Local Office tools use `mammoth`, `docx`, `jszip`, `pptxgenjs`, and
+  `fast-xml-parser`.
 - **Backend:** Node 22, Express 5, Zod, Pino, `pdf-lib`, Sharp, Ghostscript,
   Poppler, `archiver`.
 - **Cloud:** Cloud Run, Firestore Native, Cloud Storage, Firebase Auth,
@@ -97,12 +103,16 @@ Firebase web app with the `VITE_FIREBASE_*` values in `frontend/.env.example`.
 ```bash
 cd backend && npm test     # 42 tests
 cd frontend && npm run build
+cd frontend && npm run verify:local-office
 ```
 
 The backend suite covers the API surface, all 16 processors, signed flows,
 ownership, quotas, lease recovery, cleanup, worker auth, and production config
-guardrails. A full browser run (sign in → upload → process → download) was
-verified with headless Chrome; details are in the test report.
+guardrails. The local Office verifier builds 5 MB DOCX/PPTX inputs, runs every
+browser conversion, reopens the generated artifacts, blocks Office → PDF, and
+asserts that `fetch` is never called. A full browser run (sign in → upload →
+process → download) was verified with headless Chrome; details are in the test
+report.
 
 ## API
 
@@ -157,6 +167,7 @@ frontend/
     components/    header, auth modal, dropzone, job panel, badges
     context/       Firebase/dev auth
     pages/         home, browse, recent, settings, tool pages
+    services/      FileServiceRouter and LocalFileAdapter (Office stays local)
     api.js         signed-upload and job client
     styles.css     Neo-Brutalist design system
 infra/             GCP provisioning, Firestore rules/indexes, GCS lifecycle

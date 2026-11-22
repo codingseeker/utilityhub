@@ -236,7 +236,23 @@ curl -fsS http://127.0.0.1:5173/ >/dev/null
 docker compose down
 ```
 
-## 9. Verdict
+## 9. Local Office verification (2026-11-22)
+
+`cd frontend && npm run verify:local-office` builds a 5.03 MB DOCX and a 5.05 MB
+PPTX, exercises all four local operations, reopens the generated DOCX/PPTX, and
+asserts that `fetch` is never called. A headless Chrome smoke test then loaded
+the production preview and:
+
+- rendered `TXT to DOCX` with the `● LOCAL` badge;
+- uploaded a text file, generated a 9.4 KB DOCX, and downloaded it;
+- re-uploaded that DOCX, extracted the text, and downloaded the TXT;
+- generated a 54.3 KB PPTX and extracted its three slides back to text;
+- recorded zero `/api` requests during every local processing step.
+
+Office → PDF is rejected with: "Direct PDF conversion for Office files is not
+supported locally. Please use the extract text tools."
+
+## 10. Verdict
 
 The local application, processors, signed-upload flow, job lifecycle, cleanup,
 UI, and production configuration guardrails are verified. Production deployment

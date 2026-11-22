@@ -3,14 +3,92 @@ const IMAGES = ["image/jpeg", "image/png", "image/webp"];
 const TEXT = ["text/plain", "text/markdown"];
 const CSV = ["text/csv", "text/plain", "application/vnd.ms-excel"];
 const JSON_MIME = ["application/json", "text/plain"];
+const DOCX = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+const PPTX = ["application/vnd.openxmlformats-officedocument.presentationml.presentation"];
 
 export const CATEGORY_META = {
   pdf: { id: "pdf", name: "PDF", tagline: "Assemble, split, compress, rotate." },
   photo: { id: "photo", name: "Photo", tagline: "Convert, shrink, sample colour." },
   data: { id: "data", name: "Data", tagline: "CSV, JSON, and table inspection." },
   text: { id: "text", name: "Text", tagline: "Case, counts, and cleanup." },
+  office: { id: "office", name: "Office", tagline: "Word and slides, entirely local." },
   utilities: { id: "utilities", name: "Utilities", tagline: "Instant client-side maths." },
 };
+
+/**
+ * Office tools are defined in the frontend on purpose. The backend catalog
+ * cannot advertise them, and no Office byte should ever reach it.
+ */
+export const LOCAL_TOOLS = [
+  {
+    id: "docx-to-txt",
+    name: "DOCX to TXT",
+    category: "office",
+    description: "Extract raw text from a Word document without uploading it.",
+    runtime: "local",
+    local: true,
+    input: {
+      kind: "office",
+      minFiles: 1,
+      maxFiles: 1,
+      maxFileSizeBytes: 25 * 1024 * 1024,
+      accept: DOCX,
+      extensions: [".docx"],
+    },
+    options: [],
+  },
+  {
+    id: "txt-to-docx",
+    name: "TXT to DOCX",
+    category: "office",
+    description: "Build a Word document from plain text, in this tab.",
+    runtime: "local",
+    local: true,
+    input: {
+      kind: "text",
+      minFiles: 1,
+      maxFiles: 1,
+      maxFileSizeBytes: 25 * 1024 * 1024,
+      accept: TEXT,
+      extensions: [".txt", ".md"],
+    },
+    options: [],
+  },
+  {
+    id: "pptx-to-txt",
+    name: "PPTX to TXT",
+    category: "office",
+    description: "Pull the text out of PowerPoint slides without a worker.",
+    runtime: "local",
+    local: true,
+    input: {
+      kind: "office",
+      minFiles: 1,
+      maxFiles: 1,
+      maxFileSizeBytes: 25 * 1024 * 1024,
+      accept: PPTX,
+      extensions: [".pptx"],
+    },
+    options: [],
+  },
+  {
+    id: "txt-to-pptx",
+    name: "TXT to PPTX",
+    category: "office",
+    description: "Turn every non-empty line into a slide, locally.",
+    runtime: "local",
+    local: true,
+    input: {
+      kind: "text",
+      minFiles: 1,
+      maxFiles: 1,
+      maxFileSizeBytes: 25 * 1024 * 1024,
+      accept: TEXT,
+      extensions: [".txt", ".md"],
+    },
+    options: [],
+  },
+];
 
 export const FALLBACK_TOOLS = [
   {
@@ -210,6 +288,7 @@ export const FALLBACK_TOOLS = [
       { name: "stripHtml", label: "Strip HTML tags", type: "boolean", default: false },
     ],
   },
+  ...LOCAL_TOOLS,
   {
     id: "unit-converter",
     name: "Unit Converter",
@@ -233,6 +312,26 @@ export const FALLBACK_TOOLS = [
 export const TOOL_SUMMARIES = Object.fromEntries(
   FALLBACK_TOOLS.map((tool) => [tool.id, tool.description]),
 );
+
+/**
+ * The API catalog does not know about frontend-only tools, so merge the local
+ * definitions after every successful fetch. Local tools win on duplicate ids.
+ */
+export function mergeCatalogOperations(operations) {
+  const remote = Array.isArray(operations) ? operations : [];
+  const localIds = new Set(LOCAL_TOOLS.map((tool) => tool.id));
+  return [...remote.filter((tool) => !localIds.has(tool.id)), ...LOCAL_TOOLS];
+}
+
+export function isLocalTool(tool) {
+  return tool?.runtime === "local" || Boolean(tool?.local);
+}
+
+export function runtimeBadge(tool) {
+  if (isLocalTool(tool)) return { status: "local", label: "● LOCAL" };
+  if (tool?.runtime === "client") return { status: "client", label: "INSTANT" };
+  return { status: "cloud", label: "CLOUD" };
+}
 
 export function toolById(tools, id) {
   return tools.find((tool) => tool.id === id) || FALLBACK_TOOLS.find((tool) => tool.id === id) || null;
@@ -404,6 +503,10 @@ export function summaryEntries(summary) {
   const labels = {
     inputCount: "Input files",
     pageCount: "Pages",
+    slides: "Slides",
+    sourceFormat: "Input format",
+    outputFormat: "Output format",
+    messages: "Parser notes",
     partCount: "Parts",
     imageCount: "Images",
     pagesRotated: "Pages rotated",
