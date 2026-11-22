@@ -1,6 +1,10 @@
 import { isOfficeFile } from "./services/fileTypes.js";
+import { supabaseUrl } from "./supabase.js";
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api/v1").replace(/\/+$/, "");
+const DEFAULT_API_BASE = supabaseUrl
+  ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/api`
+  : "/api/v1";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
 
 const LOCAL_ONLY_MESSAGE =
   "Office files are processed in this browser and are never uploaded to Cloud Storage or the API.";

@@ -13,9 +13,9 @@
     "verify:local-office": "node scripts/verify-local-office.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "docx": "^9.16.0",
     "fast-xml-parser": "^5.12.1",
-    "firebase": "^11.10.0",
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
     "pptxgenjs": "^4.0.1",

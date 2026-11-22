@@ -212,12 +212,6 @@ svg {
   color: var(--text);
 }
 
-.button-google {
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--line);
-}
-
 .button-large {
   min-height: 54px;
   padding: 15px 26px;
@@ -1745,6 +1739,16 @@ svg {
   font-size: 12px;
 }
 
+.form-notice {
+  margin-top: 14px;
+  border: 2px solid var(--mint);
+  border-left-width: 8px;
+  background: color-mix(in srgb, var(--mint) 16%, var(--panel));
+  padding: 11px 14px;
+  color: var(--text);
+  font-size: 13px;
+}
+
 .submit-block {
   display: flex;
   flex-direction: column;
@@ -2307,58 +2311,11 @@ svg {
   gap: 14px;
 }
 
-.dev-banner {
-  border: 2px solid var(--line);
-  border-left: 8px solid var(--mustard);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-}
-
-.dev-banner strong {
-  font-family: "Oswald", sans-serif;
-  text-transform: uppercase;
-  font-size: 14px;
-}
-
-.code-inline,
-.dev-banner code {
+.code-inline {
   font-family: "JetBrains Mono", monospace;
   font-size: 10px;
   background: var(--panel-2);
   padding: 1px 4px;
-}
-
-.google-g {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  background: var(--ink);
-  color: var(--paper);
-  font-family: "Archivo Black", sans-serif;
-  font-size: 12px;
-}
-
-.or-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--muted);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 10px;
-  text-transform: uppercase;
-}
-
-.or-divider::before,
-.or-divider::after {
-  content: "";
-  flex: 1;
-  height: 2px;
-  background: var(--line);
-  opacity: 0.25;
 }
 
 .auth-tabs {

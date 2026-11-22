@@ -104,7 +104,7 @@ export default function RecentPage({ navigate, onSignIn }) {
           <span className="gate-mark display">ID</span>
           <p className="eyebrow">Recent jobs</p>
           <h1 className="display">Sign in to see your history.</h1>
-          <p>Firestore keeps job documents scoped to your Firebase UID. Nothing is shared between accounts.</p>
+          <p>Your job history is scoped to your account. Nothing is shared between accounts.</p>
           <button type="button" className="button button-mustard" onClick={onSignIn}>Sign in</button>
         </div>
       </main>

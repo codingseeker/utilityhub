@@ -6,132 +6,119 @@ import {
   useMemo,
   useState,
 } from "react";
-import {
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut as firebaseSignOut,
-  updateProfile,
-} from "firebase/auth";
-import { firebaseAuth, firebaseEnabled } from "../firebase.js";
+import { supabase, supabaseEnabled } from "../supabase.js";
 
 const AuthContext = createContext(null);
-const DEV_USER_KEY = "utilityhub.dev.user";
 
-function authMode() {
-  const configured = import.meta.env.VITE_AUTH_MODE;
-  if (configured === "dev") return "dev";
-  if (configured === "firebase") return firebaseEnabled ? "firebase" : "unconfigured";
-  if (firebaseEnabled) return "firebase";
-  return import.meta.env.DEV ? "dev" : "unconfigured";
-}
-
-function readDevUser() {
-  try {
-    const raw = localStorage.getItem(DEV_USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function mapFirebaseUser(user) {
+function mapSupabaseUser(user) {
   if (!user) return null;
+  const metadata = user.user_metadata || {};
   return {
-    uid: user.uid,
+    uid: user.id,
     email: user.email,
-    displayName: user.displayName || user.email?.split("@")[0] || "UtilityHub user",
-    photoURL: user.photoURL || null,
+    displayName:
+      metadata.display_name ||
+      metadata.full_name ||
+      metadata.name ||
+      user.email?.split("@")[0] ||
+      "UtilityHub user",
+    photoURL: metadata.avatar_url || metadata.picture || null,
+    emailConfirmed: Boolean(user.email_confirmed_at || user.confirmed_at),
     dev: false,
   };
 }
 
 function friendlyAuthError(error) {
   const code = error?.code || "";
-  if (code === "auth/popup-closed-by-user") return "Google sign-in was closed before it finished.";
-  if (code === "auth/cancelled-popup-request") return "Another sign-in attempt is already open.";
-  if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
+  const message = error?.message || "";
+
+  if (code === "invalid_credentials" || /invalid login credentials/i.test(message)) {
     return "That email and password do not match an account.";
   }
-  if (code === "auth/email-already-in-use") return "An account already exists for that email.";
-  if (code === "auth/weak-password") return "Use a password with at least 6 characters.";
-  if (code === "auth/invalid-email") return "Enter a valid email address.";
-  if (code === "auth/popup-blocked") return "Your browser blocked the sign-in popup. Allow popups and retry.";
-  if (code === "auth/unauthorized-domain") {
-    return "This domain is not authorized in Firebase Authentication.";
+  if (code === "email_not_confirmed") {
+    return "Confirm your email address before signing in. Check your inbox for the verification link.";
   }
-  if (code === "auth/operation-not-allowed") {
-    return "Enable this sign-in provider in Firebase Authentication first.";
+  if (code === "user_already_exists" || /already registered/i.test(message)) {
+    return "An account already exists for that email. Sign in instead.";
   }
-  return error?.message || "Sign-in could not be completed.";
+  if (code === "weak_password" || /password should be/i.test(message)) {
+    return "Use a stronger password (at least 6 characters).";
+  }
+  if (code === "invalid_email" || /invalid email/i.test(message)) {
+    return "Enter a valid email address.";
+  }
+  if (code === "over_email_send_rate_limit" || /rate limit/i.test(message)) {
+    return "Too many emails were sent. Wait a minute and try again.";
+  }
+  if (code === "signup_disabled") {
+    return "Account signup is disabled for this project.";
+  }
+  return message || "Sign-in could not be completed.";
 }
 
 export function AuthProvider({ children }) {
-  const mode = useMemo(authMode, []);
-  const [user, setUser] = useState(() => (mode === "dev" ? readDevUser() : null));
-  const [status, setStatus] = useState(mode === "dev" ? "ready" : "loading");
+  const mode = supabaseEnabled ? "supabase" : "unconfigured";
+  const [user, setUser] = useState(null);
+  const [status, setStatus] = useState("loading");
   const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   useEffect(() => {
-    if (mode !== "firebase" || !firebaseAuth) {
+    if (!supabase) {
       setStatus("ready");
       return undefined;
     }
-    const unsubscribe = onAuthStateChanged(
-      firebaseAuth,
-      (nextUser) => {
-        setUser(mapFirebaseUser(nextUser));
-        setStatus("ready");
-      },
-      (authError) => {
-        setError(friendlyAuthError(authError));
-        setStatus("ready");
-      },
-    );
-    return unsubscribe;
-  }, [mode]);
 
-  const devSignIn = useCallback((name) => {
-    const clean = String(name || "").trim();
-    if (!clean) {
-      setError("Enter a name for the local development identity.");
-      return false;
-    }
-    const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "dev";
-    const nextUser = {
-      uid: `dev-${slug}`.slice(0, 64),
-      email: `${slug}@dev.utilityhub.local`,
-      displayName: clean,
-      photoURL: null,
-      dev: true,
+    let active = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data, error: sessionError }) => {
+        if (!active) return;
+        if (sessionError) setError(friendlyAuthError(sessionError));
+        setUser(mapSupabaseUser(data?.session?.user));
+        setStatus("ready");
+      })
+      .catch((sessionError) => {
+        if (!active) return;
+        setError(friendlyAuthError(sessionError));
+        setStatus("ready");
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      setUser(mapSupabaseUser(session?.user));
+      setStatus("ready");
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
     };
-    localStorage.setItem(DEV_USER_KEY, JSON.stringify(nextUser));
-    setUser(nextUser);
-    setError(null);
-    return true;
   }, []);
 
-  const signInGoogle = useCallback(async () => {
-    if (!firebaseAuth) return false;
+  const clearError = useCallback(() => {
     setError(null);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: "select_account" });
-      await signInWithPopup(firebaseAuth, provider);
-      return true;
-    } catch (authError) {
-      setError(friendlyAuthError(authError));
-      return false;
-    }
+    setNotice(null);
   }, []);
 
   const signInEmail = useCallback(async (email, password) => {
-    if (!firebaseAuth) return false;
+    if (!supabase) return false;
     setError(null);
+    setNotice(null);
+
     try {
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        setError(friendlyAuthError(authError));
+        return false;
+      }
       return true;
     } catch (authError) {
       setError(friendlyAuthError(authError));
@@ -140,13 +127,30 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signUpEmail = useCallback(async (email, password, displayName) => {
-    if (!firebaseAuth) return false;
+    if (!supabase) return false;
     setError(null);
+    setNotice(null);
+
+    const name = displayName?.trim();
+
     try {
-      const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
-      if (displayName?.trim()) {
-        await updateProfile(credential.user, { displayName: displayName.trim() });
-        setUser(mapFirebaseUser(firebaseAuth.currentUser));
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: name ? { display_name: name } : undefined,
+        },
+      });
+
+      if (authError) {
+        setError(friendlyAuthError(authError));
+        return false;
+      }
+
+      // Projects with email confirmation enabled return a user but no session.
+      if (!data.session) {
+        setNotice("Account created. Check your email for a confirmation link, then sign in.");
+        return false;
       }
       return true;
     } catch (authError) {
@@ -157,21 +161,18 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     setError(null);
-    if (mode === "dev") {
-      localStorage.removeItem(DEV_USER_KEY);
-      setUser(null);
-      return;
-    }
-    if (firebaseAuth) await firebaseSignOut(firebaseAuth);
-  }, [mode]);
+    setNotice(null);
+    if (supabase) await supabase.auth.signOut();
+  }, []);
 
   const getAuthHeaders = useCallback(async () => {
-    if (!user) return {};
-    if (mode === "dev") return { "X-Dev-User": user.uid };
-    if (!firebaseAuth?.currentUser) return {};
-    const token = await firebaseAuth.currentUser.getIdToken();
-    return { Authorization: `Bearer ${token}` };
-  }, [mode, user]);
+    if (!supabase) return {};
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) return {};
+    return { Authorization: `Bearer ${session.access_token}` };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -180,15 +181,25 @@ export function AuthProvider({ children }) {
       status,
       user,
       error,
-      clearError: () => setError(null),
-      signInGoogle,
+      notice,
+      clearError,
       signInEmail,
       signUpEmail,
-      devSignIn,
       signOut,
       getAuthHeaders,
     }),
-    [mode, status, user, error, signInGoogle, signInEmail, signUpEmail, devSignIn, signOut, getAuthHeaders],
+    [
+      mode,
+      status,
+      user,
+      error,
+      notice,
+      clearError,
+      signInEmail,
+      signUpEmail,
+      signOut,
+      getAuthHeaders,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

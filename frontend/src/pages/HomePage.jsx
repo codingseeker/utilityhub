@@ -170,7 +170,7 @@ export default function HomePage({ tools, navigate, catalogError, apiStatus }) {
         </div>
         <div>
           <strong className="display">Owner-scoped</strong>
-          <span>Firebase ID tokens and UID checks on every job and download.</span>
+          <span>Supabase access tokens and user checks on every job and download.</span>
         </div>
       </section>
     </main>

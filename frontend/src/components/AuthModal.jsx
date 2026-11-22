@@ -2,15 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function AuthModal({ open, onClose }) {
-  const {
-    mode,
-    error,
-    clearError,
-    signInGoogle,
-    signInEmail,
-    signUpEmail,
-    devSignIn,
-  } = useAuth();
+  const { mode, error, notice, clearError, signInEmail, signUpEmail } = useAuth();
   const [tab, setTab] = useState("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,23 +26,12 @@ export default function AuthModal({ open, onClose }) {
     setBusy(true);
     try {
       let ok = false;
-      if (mode === "dev") {
-        ok = devSignIn(name || "Local Developer");
-      } else if (tab === "signup") {
+      if (tab === "signup") {
         ok = await signUpEmail(email.trim(), password, name);
       } else {
         ok = await signInEmail(email.trim(), password);
       }
       if (ok) onClose();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function google() {
-    setBusy(true);
-    try {
-      if (await signInGoogle()) onClose();
     } finally {
       setBusy(false);
     }
@@ -64,7 +45,9 @@ export default function AuthModal({ open, onClose }) {
         <div className="modal-head">
           <div>
             <p className="eyebrow">Account</p>
-            <h2 id="auth-title">{mode === "unconfigured" ? "Connect Firebase" : "Sign in to UtilityHub"}</h2>
+            <h2 id="auth-title">
+              {mode === "unconfigured" ? "Connect Supabase" : "Sign in to UtilityHub"}
+            </h2>
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close sign in">
             ×
@@ -74,47 +57,16 @@ export default function AuthModal({ open, onClose }) {
         {mode === "unconfigured" ? (
           <div className="auth-body">
             <p className="muted">
-              Firebase Authentication is not configured for this build. Set the
-              <code> VITE_FIREBASE_* </code> variables and rebuild. Cloud jobs are
-              intentionally unavailable until a real identity provider is wired up.
+              Supabase Authentication is not configured for this build. Set the
+              <code> VITE_SUPABASE_URL </code> and
+              <code> VITE_SUPABASE_ANON_KEY </code> environment variables and rebuild.
+              Cloud jobs are unavailable until a real identity provider is wired up.
             </p>
-            <pre className="code-block">VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_APP_ID=...</pre>
+            <pre className="code-block">VITE_SUPABASE_URL=...
+VITE_SUPABASE_ANON_KEY=...</pre>
           </div>
-        ) : mode === "dev" ? (
-          <form className="auth-body" onSubmit={submit}>
-            <div className="dev-banner">
-              <strong>Development identity</strong>
-              <span>
-                This path is only for local verification. It sends an explicit
-                <code> X-Dev-User </code> header. Production builds refuse dev auth.
-              </span>
-            </div>
-            <label className="field">
-              <span>Display name</span>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Local Developer"
-                autoFocus
-              />
-            </label>
-            {error ? <p className="form-error" role="alert">{error}</p> : null}
-            <button type="submit" className="button button-primary button-wide" disabled={busy}>
-              {busy ? "Signing in…" : "Continue locally"}
-            </button>
-          </form>
         ) : (
           <div className="auth-body">
-            <button type="button" className="button button-google button-wide" onClick={google} disabled={busy}>
-              <span className="google-g" aria-hidden="true">G</span>
-              Continue with Google
-            </button>
-
-            <div className="or-divider"><span>or use email</span></div>
-
             <div className="auth-tabs" role="tablist">
               <button
                 type="button"
@@ -140,7 +92,11 @@ VITE_FIREBASE_APP_ID=...</pre>
               {tab === "signup" ? (
                 <label className="field">
                   <span>Name</span>
-                  <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+                  <input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoComplete="name"
+                  />
                 </label>
               ) : null}
               <label className="field">
@@ -167,9 +123,16 @@ VITE_FIREBASE_APP_ID=...</pre>
                 />
               </label>
               {error ? <p className="form-error" role="alert">{error}</p> : null}
+              {notice ? <p className="form-notice" role="status">{notice}</p> : null}
               <button type="submit" className="button button-primary button-wide" disabled={busy}>
                 {busy ? "Working…" : tab === "signup" ? "Create account" : "Sign in"}
               </button>
+              {tab === "signup" ? (
+                <p className="field-help">
+                  If email confirmation is enabled, you will receive a verification
+                  link before you can sign in.
+                </p>
+              ) : null}
             </form>
           </div>
         )}

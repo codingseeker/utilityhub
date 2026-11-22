@@ -168,7 +168,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
           <p className="eyebrow">{CATEGORY_META[tool.category]?.name || tool.category}</p>
           <h1 className="display">{tool.name} needs an identity.</h1>
           <p>
-            Cloud jobs are scoped to a Firebase UID and uploaded straight to
+            Cloud jobs are scoped to your account and uploaded straight to
             signed Cloud Storage URLs. Sign in to continue.
           </p>
           <button type="button" className="button button-mustard" onClick={onSignIn}>Sign in to run this tool</button>

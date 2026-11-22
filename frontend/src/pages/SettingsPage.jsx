@@ -32,9 +32,9 @@ export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
           <span className="gate-mark display">ID</span>
           <p className="eyebrow">Settings</p>
           <h1 className="display">Sign in first.</h1>
-          <p>Account details, quota, and theme controls live here once you have a Firebase identity.</p>
+          <p>Account details, quota, and theme controls live here once you sign in.</p>
           {mode === "unconfigured" ? (
-            <p className="form-error">Firebase is not configured for this build. Set VITE_FIREBASE_* and rebuild.</p>
+            <p className="form-error">Supabase Auth is not configured for this build. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then rebuild.</p>
           ) : (
             <button type="button" className="button button-mustard" onClick={onSignIn}>Sign in</button>
           )}
@@ -60,7 +60,7 @@ export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
         <section className="settings-card">
           <div className="settings-card-head">
             <p className="eyebrow">Identity</p>
-            <span className="mono">{mode === "dev" ? "DEV AUTH" : "FIREBASE AUTH"}</span>
+            <span className="mono">{mode === "unconfigured" ? "AUTH NOT CONFIGURED" : "SUPABASE AUTH"}</span>
           </div>
           <div className="profile-line">
             <span className="profile-avatar" aria-hidden="true">{(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}</span>
@@ -71,8 +71,8 @@ export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
           </div>
           <dl className="fact-list">
             <div><dt>UID</dt><dd className="mono">{user.uid}</dd></div>
-            <div><dt>Provider</dt><dd>{mode === "dev" ? "Local development header" : "Firebase Authentication"}</dd></div>
-            <div><dt>Session</dt><dd>Short-lived ID token, refreshed per request</dd></div>
+            <div><dt>Provider</dt><dd>{mode === "unconfigured" ? "Supabase not configured" : "Supabase Auth"}</dd></div>
+            <div><dt>Session</dt><dd>Short-lived access token, refreshed automatically</dd></div>
           </dl>
           <button type="button" className="button button-ghost" onClick={signOut}>Sign out</button>
         </section>

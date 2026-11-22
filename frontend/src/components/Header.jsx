@@ -25,7 +25,7 @@ function NavLink({ item, route, navigate }) {
 }
 
 export default function Header({ navigate, route, apiStatus, onSignIn }) {
-  const { user, mode, status } = useAuth();
+  const { user, status } = useAuth();
   const signedIn = Boolean(user);
 
   return (
@@ -71,7 +71,7 @@ export default function Header({ navigate, route, apiStatus, onSignIn }) {
             </button>
           ) : (
             <button type="button" className="button button-small button-mustard" onClick={onSignIn}>
-              {mode === "dev" ? "Dev sign in" : "Sign in"}
+              Sign in
             </button>
           )}
         </div>
