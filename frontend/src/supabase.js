@@ -1,25 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-// Public anon/publishable key only. Never put a service_role key in a browser build.
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-function createSupabaseClient() {
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-  try {
-    return createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
-  } catch (error) {
-    console.error("UtilityHub: Supabase client could not be initialized.", error);
-    return null;
-  }
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("Missing Supabase environment variables!");
 }
 
-export const supabase = createSupabaseClient();
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 export const supabaseEnabled = Boolean(supabase);
 export { supabaseUrl, supabaseAnonKey };

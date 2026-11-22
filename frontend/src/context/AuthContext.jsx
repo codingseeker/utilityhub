@@ -116,12 +116,14 @@ export function AuthProvider({ children }) {
       });
 
       if (authError) {
-        setError(friendlyAuthError(authError));
+        console.error("Supabase sign-in failed:", authError);
+        setError(authError.message || friendlyAuthError(authError));
         return false;
       }
       return true;
     } catch (authError) {
-      setError(friendlyAuthError(authError));
+      console.error("Supabase sign-in failed:", authError);
+      setError(authError?.message || friendlyAuthError(authError));
       return false;
     }
   }, []);
@@ -143,7 +145,8 @@ export function AuthProvider({ children }) {
       });
 
       if (authError) {
-        setError(friendlyAuthError(authError));
+        console.error("Supabase sign-up failed:", authError);
+        setError(authError.message || friendlyAuthError(authError));
         return false;
       }
 
@@ -154,7 +157,8 @@ export function AuthProvider({ children }) {
       }
       return true;
     } catch (authError) {
-      setError(friendlyAuthError(authError));
+      console.error("Supabase sign-up failed:", authError);
+      setError(authError?.message || friendlyAuthError(authError));
       return false;
     }
   }, []);

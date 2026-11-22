@@ -3,7 +3,7 @@ import { supabaseUrl } from "./supabase.js";
 
 const DEFAULT_API_BASE = supabaseUrl
   ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/api`
-  : "/api/v1";
+  : "";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
 
 const LOCAL_ONLY_MESSAGE =
@@ -67,6 +67,11 @@ function errorFrom(payload, status, fallback) {
 }
 
 async function request(path, { method = "GET", body, headers = {}, auth = {}, signal } = {}) {
+  if (!API_BASE) {
+    throw new ApiError("Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment, then rebuild.", {
+      code: "SUPABASE_NOT_CONFIGURED",
+    });
+  }
   let response;
   try {
     response = await fetch(`${API_BASE}${path}`, {

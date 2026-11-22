@@ -8,10 +8,12 @@ export default function AuthModal({ open, onClose }) {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   useEffect(() => {
     if (!open) return undefined;
     clearError();
+    setSubmitError(null);
     const onKey = (event) => {
       if (event.key === "Escape") onClose();
     };
@@ -23,6 +25,7 @@ export default function AuthModal({ open, onClose }) {
 
   async function submit(event) {
     event.preventDefault();
+    setSubmitError(null);
     setBusy(true);
     try {
       let ok = false;
@@ -32,6 +35,9 @@ export default function AuthModal({ open, onClose }) {
         ok = await signInEmail(email.trim(), password);
       }
       if (ok) onClose();
+    } catch (authError) {
+      console.error("Supabase authentication failed:", authError);
+      setSubmitError(authError?.message || "Authentication could not be completed.");
     } finally {
       setBusy(false);
     }
@@ -122,7 +128,9 @@ VITE_SUPABASE_ANON_KEY=...</pre>
                   placeholder="At least 6 characters"
                 />
               </label>
-              {error ? <p className="form-error" role="alert">{error}</p> : null}
+              {error || submitError ? (
+                <p className="form-error" role="alert">{error || submitError}</p>
+              ) : null}
               {notice ? <p className="form-notice" role="status">{notice}</p> : null}
               <button type="submit" className="button button-primary button-wide" disabled={busy}>
                 {busy ? "Working…" : tab === "signup" ? "Create account" : "Sign in"}
