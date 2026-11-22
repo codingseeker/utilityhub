@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { fetchCatalog } from "./api.js";
-import AuthModal from "./components/AuthModal.jsx";
 import Footer from "./components/Footer.jsx";
 import Header from "./components/Header.jsx";
 import { FALLBACK_TOOLS, mergeCatalogOperations, toolById } from "./tools.js";
@@ -35,7 +34,6 @@ export default function App() {
   const [tools, setTools] = useState(FALLBACK_TOOLS);
   const [apiStatus, setApiStatus] = useState("checking");
   const [catalogError, setCatalogError] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
   const [theme, setTheme] = useState(themePreference);
 
   useEffect(() => {
@@ -93,7 +91,6 @@ export default function App() {
         navigate={navigate}
         route={route}
         apiStatus={apiStatus}
-        onSignIn={() => setAuthOpen(true)}
       />
 
       {route.page === "home" ? (
@@ -105,20 +102,17 @@ export default function App() {
       ) : null}
 
       {route.page === "recent" ? (
-        <RecentPage navigate={navigate} onSignIn={() => setAuthOpen(true)} />
+        <RecentPage navigate={navigate} />
       ) : null}
 
       {route.page === "settings" ? (
         <SettingsPage
-          onSignIn={() => setAuthOpen(true)}
           theme={theme}
           onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
         />
       ) : null}
 
-      {route.page === "tool" && tool ? (
-        <ToolPage tool={tool} navigate={navigate} onSignIn={() => setAuthOpen(true)} />
-      ) : null}
+      {route.page === "tool" && tool ? <ToolPage tool={tool} navigate={navigate} /> : null}
 
       {noMatch ? (
         <main className="page-shell narrow-page">
@@ -135,7 +129,6 @@ export default function App() {
       ) : null}
 
       <Footer navigate={navigate} />
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </div>
   );
 }

@@ -1,49 +1,9 @@
-import { useEffect, useState } from "react";
-import { fetchProfile, formatApiError } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { formatBytes, formatDate } from "../tools.js";
 
-export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
-  const { user, mode, getAuthHeaders, signOut } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!user) return undefined;
-    (async () => {
-      try {
-        const headers = await getAuthHeaders();
-        const data = await fetchProfile(headers);
-        if (!cancelled) setProfile(data);
-      } catch (loadError) {
-        if (!cancelled) setError(loadError);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user, getAuthHeaders]);
-
-  if (!user) {
-    return (
-      <main className="page-shell narrow-page">
-        <div className="gate-card">
-          <span className="gate-mark display">ID</span>
-          <p className="eyebrow">Settings</p>
-          <h1 className="display">Sign in first.</h1>
-          <p>Account details, quota, and theme controls live here once you sign in.</p>
-          {mode === "unconfigured" ? (
-            <p className="form-error">Supabase Auth is not configured for this build. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then rebuild.</p>
-          ) : (
-            <button type="button" className="button button-mustard" onClick={onSignIn}>Sign in</button>
-          )}
-        </div>
-      </main>
-    );
-  }
-
-  const quota = profile?.quota || {};
+export default function SettingsPage({ theme, onToggleTheme }) {
+  const { user } = useAuth();
+  const quota = {};
   const jobPercent = quota.jobsPerDay ? Math.min(100, (quota.jobsToday / quota.jobsPerDay) * 100) : 0;
   const bytePercent = quota.bytesPerDay ? Math.min(100, (quota.bytesToday / quota.bytesPerDay) * 100) : 0;
 
@@ -54,13 +14,11 @@ export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
         <h1 className="display">Settings.</h1>
       </header>
 
-      {error ? <p className="form-error">{formatApiError(error)}</p> : null}
-
       <div className="settings-grid">
         <section className="settings-card">
           <div className="settings-card-head">
             <p className="eyebrow">Identity</p>
-            <span className="mono">{mode === "unconfigured" ? "AUTH NOT CONFIGURED" : "SUPABASE AUTH"}</span>
+            <span className="mono">DEMO MODE</span>
           </div>
           <div className="profile-line">
             <span className="profile-avatar" aria-hidden="true">{(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}</span>
@@ -71,10 +29,9 @@ export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
           </div>
           <dl className="fact-list">
             <div><dt>UID</dt><dd className="mono">{user.uid}</dd></div>
-            <div><dt>Provider</dt><dd>{mode === "unconfigured" ? "Supabase not configured" : "Supabase Auth"}</dd></div>
-            <div><dt>Session</dt><dd>Short-lived access token, refreshed automatically</dd></div>
+            <div><dt>Provider</dt><dd>Anonymous demo</dd></div>
+            <div><dt>Session</dt><dd>No account required</dd></div>
           </dl>
-          <button type="button" className="button button-ghost" onClick={signOut}>Sign out</button>
         </section>
 
         <section className="settings-card">
@@ -95,8 +52,7 @@ export default function SettingsPage({ onSignIn, theme, onToggleTheme }) {
             <div className="meter meter-ink"><span style={{ width: `${quota.maxActiveJobs ? Math.min(100, ((quota.activeJobs || 0) / quota.maxActiveJobs) * 100) : 0}%` }} /></div>
           </div>
           <p className="fine-print">
-            Limits are enforced server-side in Firestore. Raising them means changing
-            Cloud Run environment variables, not the browser.
+            Demo usage limits depend on the configured backend.
           </p>
         </section>
 

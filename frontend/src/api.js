@@ -1,6 +1,6 @@
 import { isOfficeFile } from "./services/fileTypes.js";
-import { supabaseUrl } from "./supabase.js";
 
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
 const DEFAULT_API_BASE = supabaseUrl
   ? `${supabaseUrl.replace(/\/+$/, "")}/functions/v1/api`
   : "";
@@ -15,21 +15,6 @@ function assertCloudSafe(files) {
   }
 }
 
-const EXTENSION_MIME = {
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  tif: "image/tiff",
-  tiff: "image/tiff",
-  csv: "text/csv",
-  tsv: "text/csv",
-  json: "application/json",
-  txt: "text/plain",
-  md: "text/markdown",
-};
-
 export class ApiError extends Error {
   constructor(message, { code = "REQUEST_FAILED", status = 0, details, requestId } = {}) {
     super(message);
@@ -39,12 +24,6 @@ export class ApiError extends Error {
     this.details = details;
     this.requestId = requestId;
   }
-}
-
-function mimeForFile(file) {
-  if (file.type) return file.type;
-  const extension = file.name.split(".").pop()?.toLowerCase();
-  return EXTENSION_MIME[extension] || "application/octet-stream";
 }
 
 function parseJson(text) {
@@ -58,7 +37,7 @@ function parseJson(text) {
 
 function errorFrom(payload, status, fallback) {
   const error = payload?.error;
-  return new ApiError(error?.message || fallback, {
+  return new ApiError((typeof error === "string" ? error : error?.message) || fallback, {
     code: error?.code || "REQUEST_FAILED",
     status,
     details: error?.details,
@@ -66,9 +45,9 @@ function errorFrom(payload, status, fallback) {
   });
 }
 
-async function request(path, { method = "GET", body, headers = {}, auth = {}, signal } = {}) {
+async function request(path, { method = "GET", body, headers = {}, signal } = {}) {
   if (!API_BASE) {
-    throw new ApiError("Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment, then rebuild.", {
+    throw new ApiError("The demo backend URL is not configured for this deployment.", {
       code: "SUPABASE_NOT_CONFIGURED",
     });
   }
@@ -79,7 +58,6 @@ async function request(path, { method = "GET", body, headers = {}, auth = {}, si
       headers: {
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-        ...auth,
         ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -99,151 +77,89 @@ async function request(path, { method = "GET", body, headers = {}, auth = {}, si
     throw errorFrom(payload, response.status, "The request could not be completed.");
   }
 
-  return payload?.data ?? null;
+  return payload?.data ?? payload;
+}
+
+function callEdge(action, values = {}) {
+  return request("", { method: "POST", body: { action, ...values } });
 }
 
 export function fetchCatalog() {
-  return request("/operations");
+  return Promise.resolve({ operations: [] });
 }
 
-export async function fetchProfile(auth) {
-  return request("/me", { auth });
+export async function fetchProfile() {
+  return { displayName: "Demo user", email: "demo@utilityhub.com" };
 }
 
-export async function startSession(auth) {
-  return request("/auth/session", { method: "POST", body: {}, auth });
+export async function startSession() {
+  return { id: "anonymous" };
 }
 
-export async function initUploads(files, auth) {
+export async function initUploads(files) {
   assertCloudSafe(files);
-  return request("/uploads/init", {
-    method: "POST",
-    auth,
-    body: {
-      files: files.map((file) => ({
-        name: file.name,
-        sizeBytes: file.size,
-        mimeType: mimeForFile(file),
-      })),
-    },
-  });
-}
-
-export function uploadToSignedUrl(upload, file, onProgress) {
-  assertCloudSafe([file]);
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open(upload.method || "PUT", upload.url);
-    xhr.timeout = 180000;
-
-    for (const [name, value] of Object.entries(upload.headers || {})) {
-      xhr.setRequestHeader(name, value);
+  const uploads = [];
+  for (const file of files) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
     }
-    if (!upload.headers?.["Content-Type"] && !upload.headers?.["content-type"]) {
-      xhr.setRequestHeader("Content-Type", mimeForFile(file));
-    }
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && onProgress) {
-        onProgress(event.loaded / event.total);
-      }
-    };
-    xhr.onerror = () =>
-      reject(new ApiError("The upload failed. Check your connection and try again.", {
-        code: "UPLOAD_FAILED",
-      }));
-    xhr.ontimeout = () =>
-      reject(new ApiError("The upload took too long. Try smaller files.", {
-        code: "UPLOAD_TIMEOUT",
-      }));
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-        return;
-      }
-      reject(
-        errorFrom(
-          parseJson(xhr.responseText),
-          xhr.status,
-          "The file could not be uploaded to cloud storage.",
-        ),
-      );
-    };
-
-    xhr.send(file);
-  });
+    const response = await callEdge("upload", { filename: file.name, file: btoa(binary) });
+    uploads.push({ uploadId: response.jobId });
+  }
+  return { uploads };
 }
 
-export async function discardUpload(uploadId, auth) {
-  return request(`/uploads/${encodeURIComponent(uploadId)}`, {
-    method: "DELETE",
-    auth,
-  });
+export async function discardUpload(uploadId) {
+  return callEdge("delete", { jobId: uploadId });
 }
 
-/**
- * Runs the full signed-upload flow and reports aggregate progress. Bytes never
- * pass through the API; the browser PUTs directly to the signed storage URL.
- */
-export async function uploadJobFiles(files, auth, onProgress) {
+/** Sends file bytes to the demo endpoint and reports completion. */
+export async function uploadJobFiles(files, onProgress) {
   assertCloudSafe(files);
-  const totalBytes = files.reduce((sum, file) => sum + file.size, 0) || 1;
-  const { uploads } = await initUploads(files, auth);
-  if (!Array.isArray(uploads) || uploads.length !== files.length) {
-    throw new ApiError("The upload session was incomplete. Try again.", {
-      code: "INVALID_RESPONSE",
-    });
-  }
-
-  const completed = new Array(files.length).fill(0);
-  for (let index = 0; index < uploads.length; index += 1) {
-    const file = files[index];
-    try {
-      await uploadToSignedUrl(uploads[index], file, (fraction) => {
-        completed[index] = file.size * fraction;
-        const loaded = completed.reduce((sum, value) => sum + value, 0);
-        onProgress?.(Math.min(100, Math.round((loaded / totalBytes) * 100)));
-      });
-      completed[index] = file.size;
-      onProgress?.(Math.min(100, Math.round((completed.reduce((a, b) => a + b, 0) / totalBytes) * 100)));
-    } catch (error) {
-      // Leave no orphaned objects behind when a later file fails.
-      for (let cleanup = index; cleanup < uploads.length; cleanup += 1) {
-        discardUpload(uploads[cleanup].uploadId, auth).catch(() => undefined);
-      }
-      throw error;
-    }
-  }
-
+  const { uploads } = await initUploads(files);
+  onProgress?.(100);
   return uploads.map((upload) => upload.uploadId);
 }
 
-export async function createJob({ operation, uploads, options }, auth) {
-  return request("/jobs", {
-    method: "POST",
-    auth,
-    body: { operation, uploads, options },
-  });
+export async function createJob({ uploads }) {
+  if (!uploads?.length) throw new ApiError("Upload a file to start processing.");
+  const response = await callEdge("process", { jobId: uploads[0] });
+  return normalizeJob(response.job);
 }
 
-export function fetchJob(jobId, auth) {
-  return request(`/jobs/${encodeURIComponent(jobId)}`, { auth });
+function normalizeJob(job) {
+  if (!job) return job;
+  return {
+    ...job,
+    result: job.result || {
+      fileName: job.filename,
+      sizeBytes: 0,
+      path: job.result_path,
+    },
+  };
 }
 
-export async function requestDownload(jobId, auth) {
-  return request(`/jobs/${encodeURIComponent(jobId)}/download`, { auth });
+export async function fetchJob(jobId) {
+  const response = await callEdge("status", { jobId });
+  return normalizeJob(response.job);
 }
 
-export function deleteJob(jobId, auth) {
-  return request(`/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE", auth });
+export async function requestDownload(jobId) {
+  return callEdge("download", { jobId });
 }
 
-export function listJobs(auth, limit = 25) {
-  return request(`/me/jobs?limit=${encodeURIComponent(limit)}`, { auth });
+export async function deleteJob(jobId) {
+  return callEdge("delete", { jobId });
 }
 
-export function clearHistory(auth) {
-  return request("/me/jobs", { method: "DELETE", auth });
+export async function listJobs() {
+  return { jobs: [] };
+}
+
+export async function clearHistory() {
+  return { deleted: 0 };
 }
 
 export function formatApiError(error) {

@@ -24,9 +24,8 @@ function NavLink({ item, route, navigate }) {
   );
 }
 
-export default function Header({ navigate, route, apiStatus, onSignIn }) {
-  const { user, status } = useAuth();
-  const signedIn = Boolean(user);
+export default function Header({ navigate, route, apiStatus }) {
+  const { user } = useAuth();
 
   return (
     <>
@@ -60,20 +59,14 @@ export default function Header({ navigate, route, apiStatus, onSignIn }) {
             CLOUD
           </span>
 
-          {status === "loading" ? (
-            <span className="auth-chip auth-chip-loading">Checking…</span>
-          ) : signedIn ? (
+          {user ? (
             <button type="button" className="user-chip" onClick={() => navigate("/settings")}>
               <span className="user-avatar" aria-hidden="true">
                 {(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
               </span>
               <span className="user-name">{user.displayName || user.email}</span>
             </button>
-          ) : (
-            <button type="button" className="button button-small button-mustard" onClick={onSignIn}>
-              Sign in
-            </button>
-          )}
+          ) : null}
         </div>
       </header>
 

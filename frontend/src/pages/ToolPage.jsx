@@ -51,8 +51,8 @@ function maxTotalFor(tool) {
   return tool.input?.maxTotalBytes || maxSizeFor(tool) * (tool.input?.maxFiles || 1);
 }
 
-export default function ToolPage({ tool, navigate, onSignIn }) {
-  const { user, getAuthHeaders } = useAuth();
+export default function ToolPage({ tool, navigate }) {
+  const { user } = useAuth();
   const [files, setFiles] = useState([]);
   const [options, setOptions] = useState(() => defaultOptions(tool));
   const [job, setJob] = useState(null);
@@ -90,8 +90,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     let cancelled = false;
     (async () => {
       try {
-        const auth = await getAuthHeaders();
-        const data = await fetchJob(jobId, auth);
+        const data = await fetchJob(jobId);
         if (cancelled) return;
         if (data.operation !== tool.id) {
           setFormError("That job belongs to a different tool.");
@@ -106,7 +105,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     return () => {
       cancelled = true;
     };
-  }, [tool.id, user?.uid, isClient, isLocal, getAuthHeaders, tool]);
+  }, [tool.id, user?.uid, isClient, isLocal, tool]);
 
   useEffect(() => {
     if (!job || (job.status !== "queued" && job.status !== "processing") || !user) {
@@ -117,8 +116,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
 
     const poll = async () => {
       try {
-        const auth = await getAuthHeaders();
-        const data = await fetchJob(job.id, auth);
+        const data = await fetchJob(job.id);
         if (cancelled) return;
         if (data.operation !== tool.id) {
           setJob(null);
@@ -146,7 +144,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [job?.id, job?.status, user, getAuthHeaders, tool.id]);
+  }, [job?.id, job?.status, user, tool.id]);
 
   if (isClient) {
     return <ClientToolPage tool={tool} navigate={navigate} />;
@@ -154,27 +152,6 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
 
   if (isLocal) {
     return <LocalToolPage tool={tool} navigate={navigate} />;
-  }
-
-  if (!user) {
-    return (
-      <main className="page-shell narrow-page">
-        <button type="button" className="back-link" onClick={() => navigate("/browse")}>
-          <span aria-hidden="true">←</span> All tools
-        </button>
-        <div className="gate-card">
-          <span className="gate-mark"><ToolIcon id={tool.id} size={44} /></span>
-          <StatusBadge status="cloud" label="CLOUD TOOL" />
-          <p className="eyebrow">{CATEGORY_META[tool.category]?.name || tool.category}</p>
-          <h1 className="display">{tool.name} needs an identity.</h1>
-          <p>
-            Cloud jobs are scoped to your account and uploaded straight to
-            signed Cloud Storage URLs. Sign in to continue.
-          </p>
-          <button type="button" className="button button-mustard" onClick={onSignIn}>Sign in to run this tool</button>
-        </div>
-      </main>
-    );
   }
 
   function addFiles(list) {
@@ -291,10 +268,8 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     setUpload({ active: true, progress: 0, stage: "uploading" });
     let uploadIds = [];
     try {
-      const auth = await getAuthHeaders();
       uploadIds = await uploadJobFiles(
         files.map((entry) => entry.file),
-        auth,
         (progress) => setUpload({ active: true, progress, stage: "uploading" }),
       );
       setUpload({ active: true, progress: 100, stage: "creating" });
@@ -304,15 +279,13 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
           uploads: uploadIds,
           options: buildOptions(tool, options),
         },
-        auth,
       );
       setJob(created);
       window.history.replaceState({}, "", `/tools/${tool.id}?job=${created.id}`);
     } catch (error) {
       setFormError(error);
       if (uploadIds.length > 0) {
-        const auth = await getAuthHeaders();
-        for (const uploadId of uploadIds) discardUpload(uploadId, auth).catch(() => undefined);
+        for (const uploadId of uploadIds) discardUpload(uploadId).catch(() => undefined);
       }
     } finally {
       setUpload({ active: false, progress: 0, stage: null });
@@ -324,8 +297,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     setDownloading(true);
     setActionError(null);
     try {
-      const auth = await getAuthHeaders();
-      const info = await requestDownload(job.id, auth);
+      const info = await requestDownload(job.id);
       const link = document.createElement("a");
       link.href = info.url;
       link.download = info.fileName || job.result?.fileName || "download";
@@ -350,8 +322,7 @@ export default function ToolPage({ tool, navigate, onSignIn }) {
     setDeleting(true);
     setActionError(null);
     try {
-      const auth = await getAuthHeaders();
-      await deleteJob(job.id, auth);
+      await deleteJob(job.id);
       resetJob();
     } catch (error) {
       setActionError(error);

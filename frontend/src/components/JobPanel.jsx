@@ -26,12 +26,12 @@ export default function JobPanel({
           <span className="mono job-id">#{job.id.slice(-8)}</span>
         </div>
         <h2 className="display job-title">
-          {job.status === "queued" ? "Waiting in the cloud queue." : "Processing in the cloud."}
+          {job.status === "queued" ? "Waiting to process." : "Copying your file."}
         </h2>
         <p className="muted">
           {job.status === "queued"
-            ? "Your signed upload is stored. A Cloud Run worker will claim the job automatically."
-            : "A Cloud Run worker is running the real processing engine. Keep this tab open."}
+            ? "Your upload is stored and ready for the demo processor."
+            : "The demo processor copies the uploaded file unchanged."}
         </p>
 
         <ol className="timeline" aria-label="Job progress">
@@ -69,7 +69,7 @@ export default function JobPanel({
           <span className="mono job-id">#{job.id.slice(-8)}</span>
         </div>
         <p className="eyebrow">Result ready</p>
-        <h2 className="display job-title">Verified and ready.</h2>
+        <h2 className="display job-title">Demo copy ready.</h2>
         <div className="result-file">
           <strong>{result.fileName || "processed-file"}</strong>
           <span className="mono">

@@ -4,8 +4,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import StatusBadge from "../components/StatusBadge.jsx";
 import { formatBytes, formatDate, timeRemaining } from "../tools.js";
 
-export default function RecentPage({ navigate, onSignIn }) {
-  const { user, getAuthHeaders } = useAuth();
+export default function RecentPage({ navigate }) {
+  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,8 +16,7 @@ export default function RecentPage({ navigate, onSignIn }) {
     if (!user) return;
     if (!quiet) setLoading(true);
     try {
-      const auth = await getAuthHeaders();
-      const data = await listJobs(auth, 40);
+      const data = await listJobs(40);
       setJobs(data.jobs || []);
       setError(null);
     } catch (loadError) {
@@ -25,7 +24,7 @@ export default function RecentPage({ navigate, onSignIn }) {
     } finally {
       setLoading(false);
     }
-  }, [getAuthHeaders, user]);
+  }, [user]);
 
   useEffect(() => {
     if (!user) {
@@ -49,8 +48,7 @@ export default function RecentPage({ navigate, onSignIn }) {
     setBusy(job.id);
     setError(null);
     try {
-      const auth = await getAuthHeaders();
-      const info = await requestDownload(job.id, auth);
+      const info = await requestDownload(job.id);
       const link = document.createElement("a");
       link.href = info.url;
       link.download = info.fileName || job.result?.fileName || "download";
@@ -71,8 +69,7 @@ export default function RecentPage({ navigate, onSignIn }) {
     setBusy(job.id);
     setError(null);
     try {
-      const auth = await getAuthHeaders();
-      await deleteJob(job.id, auth);
+      await deleteJob(job.id);
       setJobs((previous) => previous.filter((item) => item.id !== job.id));
     } catch (deleteError) {
       setError(deleteError);
@@ -86,8 +83,7 @@ export default function RecentPage({ navigate, onSignIn }) {
     setBusy("all");
     setError(null);
     try {
-      const auth = await getAuthHeaders();
-      const result = await clearHistory(auth);
+      const result = await clearHistory();
       setJobs((previous) => previous.filter((job) => job.status === "queued" || job.status === "processing"));
       if (result.deleted === 0) setError(new Error("There were no finished jobs to clear."));
     } catch (clearError) {
@@ -95,20 +91,6 @@ export default function RecentPage({ navigate, onSignIn }) {
     } finally {
       setBusy(null);
     }
-  }
-
-  if (!user) {
-    return (
-      <main className="page-shell narrow-page">
-        <div className="gate-card">
-          <span className="gate-mark display">ID</span>
-          <p className="eyebrow">Recent jobs</p>
-          <h1 className="display">Sign in to see your history.</h1>
-          <p>Your job history is scoped to your account. Nothing is shared between accounts.</p>
-          <button type="button" className="button button-mustard" onClick={onSignIn}>Sign in</button>
-        </div>
-      </main>
-    );
   }
 
   return (
